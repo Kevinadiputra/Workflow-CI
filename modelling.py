@@ -14,8 +14,10 @@ def main():
     parser.add_argument("--max_depth", type=int, default=5, help="Maximum tree depth")
     args = parser.parse_args()
     
-    # Set experiment
-    mlflow.set_experiment("Heart_Disease_Workflow_CI")
+    # Set experiment only if not running inside an MLflow project run (which manages its own experiment ID)
+    if "MLFLOW_RUN_ID" not in os.environ:
+        mlflow.set_experiment("Heart_Disease_Workflow_CI")
+
     
     # Load dataset
     # By default, it will load from dataset/heart_disease_preprocessed.csv
