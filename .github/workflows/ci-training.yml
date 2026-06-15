@@ -10,39 +10,32 @@ on:
       - 'conda.yaml'
       - 'dataset/**'
       - 'Dockerfile'
+      - '.github/workflows/ci-training.yml' # Ensure updates to this file trigger a run
   workflow_dispatch:
 
 jobs:
   train-and-deploy:
     runs-on: ubuntu-latest
-    
-    # Essential: Use login shell to enable Conda initialization and activation in bash
-    defaults:
-      run:
-        shell: bash -el {0}
 
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    # Setup Miniconda correctly
-    - name: Setup Miniconda
-      uses: conda-incubator/setup-miniconda@v3
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
-        auto-update-conda: true
         python-version: '3.10'
-        activate-environment: mlflow-base-env
+        cache: 'pip'
 
-    # Install MLflow inside the Conda environment so it can orchestrate the project run
-    - name: Install MLflow
+    - name: Install Dependencies
       run: |
-        conda install -y -c conda-forge mlflow
-        pip install conda-repo-cli
+        python -m pip install --upgrade pip
+        pip install mlflow pandas numpy scikit-learn
 
     - name: Run MLflow Project
       run: |
-        # Run MLflow Project. It will automatically create the environment from conda.yaml
-        mlflow run . --experiment-name "Heart_Disease_CI"
+        # Run MLflow Project using local environment to bypass conda activation bugs in Actions runner
+        mlflow run . --env-manager local --experiment-name "Heart_Disease_CI"
 
     # Compress and save MLflow runs as artifacts
     - name: Compress MLflow Runs
