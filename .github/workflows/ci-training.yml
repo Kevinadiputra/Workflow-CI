@@ -5,10 +5,10 @@ on:
     branches:
       - main
     paths:
-      - 'modelling.py'
-      - 'MLproject'
-      - 'conda.yaml'
-      - 'dataset/**'
+      - 'MLProject/modelling.py'
+      - 'MLProject/MLproject'
+      - 'MLProject/conda.yaml'
+      - 'MLProject/dataset/**'
       - 'Dockerfile'
       - '.github/workflows/ci-training.yml' # Ensure updates to this file trigger a run
   workflow_dispatch:
@@ -45,7 +45,12 @@ jobs:
     - name: Run MLflow Project
       run: |
         # Run MLflow Project. It will automatically create the environment from conda.yaml
-        mlflow run . --experiment-name "Heart_Disease_CI"
+        mlflow run MLProject --experiment-name "Heart_Disease_CI"
+
+    # Copy the generated model from the project folder to the root context for Docker packaging
+    - name: Copy trained model for serving
+      run: |
+        cp -r MLProject/model ./model
 
     # Compress and save MLflow runs as artifacts
     - name: Compress MLflow Runs
