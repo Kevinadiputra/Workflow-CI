@@ -8,3 +8,6 @@ mlruns/
 mlruns.db
 mlruns.tar.gz
 model/
+
+# Ignored compatibility folders
+/dataset/
