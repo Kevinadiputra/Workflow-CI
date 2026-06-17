@@ -85,9 +85,11 @@ else:
 # --- COMPUTE REAL ACCURACY FROM TEST DATA ---
 computed_accuracy = None
 TEST_DATA_PATHS = [
+    os.path.join("Membangun_Model", "dataset_preprocessed", "test.csv"),
     os.path.join("Membangun_model", "dataset_preprocessed", "test.csv"),
     os.path.join("dataset_preprocessed", "test.csv"),
-    os.path.join("Eksperimen_SML_Kevinadiputra", "preprocessing", "dataset_preprocessed", "test.csv"),
+    os.path.join("Eksperimen_SML_Kevin_Adiputra", "preprocessing", "dataset_preprocessed", "test.csv"),
+    os.path.join("Eksperimen_SML_Kevin_Adiputra", "preprocessing", "dataset_preprocessing", "test.csv"),
 ]
 
 test_data_path = None
