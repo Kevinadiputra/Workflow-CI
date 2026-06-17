@@ -10,7 +10,7 @@ on:
       - 'MLProject/conda.yaml'
       - 'MLProject/dataset/**'
       - 'Dockerfile'
-      - '.github/workflows/ci-training.yml' # Ensure updates to this file trigger a run
+      - '.github/workflows/ci-training.yml'
   workflow_dispatch:
 
 env:
@@ -44,7 +44,6 @@ jobs:
 
     - name: Run MLflow Project
       run: |
-        # Run MLflow Project. It will automatically create the environment from conda.yaml
         mlflow run MLProject --experiment-name "Heart_Disease_CI"
 
     # Copy the generated model from the project folder to the root context for Docker packaging
@@ -62,7 +61,18 @@ jobs:
       with:
         name: mlflow-runs-artifact
         path: mlruns.tar.gz
-        retention-days: 7
+        retention-days: 30
+
+    # Save model artifacts to the repository itself
+    - name: Save model artifacts to repository
+      run: |
+        mkdir -p saved_artifacts
+        cp -r model/* saved_artifacts/
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add saved_artifacts/
+        git diff --cached --quiet || git commit -m "ci: save trained model artifacts [skip ci]"
+        git push origin main || echo "Push failed, artifacts still available as upload-artifact"
 
     # Build and Push Docker Image for Serving the Model
     - name: Log in to Docker Hub

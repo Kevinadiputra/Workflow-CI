@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import psutil
 import numpy as np
@@ -7,13 +8,14 @@ from fastapi import FastAPI, Response, Request, HTTPException
 from pydantic import BaseModel
 from prometheus_client import Counter, Gauge, Histogram, Summary, generate_latest, CONTENT_TYPE_LATEST
 import mlflow.sklearn
+from sklearn.metrics import accuracy_score
 
 app = FastAPI(title="Heart Disease Model Serving & Monitoring API")
 
 # Record start time for throughput calculation
 startup_time = time.time()
 
-# --- DEFINE PROMETHEUS METRICS (10 Metrics Required) ---
+# --- DEFINE PROMETHEUS METRICS (10 Metrics) ---
 prediction_count = Counter(
     "prediction_count_total", 
     "Total number of predictions made by the model"
@@ -30,6 +32,14 @@ error_count = Counter(
     "error_count_total", 
     "Total number of errors encountered by the API"
 )
+prediction_success = Counter(
+    "prediction_success_total",
+    "Total number of successful predictions"
+)
+prediction_failed = Counter(
+    "prediction_failed_total",
+    "Total number of failed predictions"
+)
 cpu_usage = Gauge(
     "cpu_usage_percent", 
     "CPU utilization in percent"
@@ -44,7 +54,7 @@ disk_usage = Gauge(
 )
 model_accuracy = Gauge(
     "model_accuracy_ratio", 
-    "Last recorded test accuracy of the active model"
+    "Test accuracy of the active model computed from test dataset"
 )
 throughput = Gauge(
     "api_throughput_requests_per_second", 
@@ -55,34 +65,55 @@ response_time = Summary(
     "Overall API response time in seconds"
 )
 
-# --- LOAD MODEL (With Safe Fail-safe Mock) ---
-# Check if model folder exists, otherwise use a simple trained mock model so the app doesn't crash on startup
+# --- LOAD MODEL (No Dummy/Fallback - Fail Fast) ---
+MODEL_PATH = "model"
 model = None
-try:
-    if os.path.exists("model"):
-        model = mlflow.sklearn.load_model("model")
-        print("Successfully loaded trained RandomForest model from 'model/'.")
-    elif os.path.exists("Workflow-CI/model"):
-        model = mlflow.sklearn.load_model("Workflow-CI/model")
-        print("Successfully loaded trained RandomForest model from 'Workflow-CI/model/'.")
-    else:
-        print("No trained model found. Initializing a mock classifier for safety...")
-        from sklearn.ensemble import RandomForestClassifier
-        model = RandomForestClassifier(random_state=42)
-        # 23 features (standard preprocessed dataset)
-        X_dummy = np.random.randn(10, 23)
-        y_dummy = np.random.randint(0, 2, size=10)
-        model.fit(X_dummy, y_dummy)
-except Exception as e:
-    print(f"Error loading model: {e}. Falling back to a mock classifier...")
-    from sklearn.ensemble import RandomForestClassifier
-    model = RandomForestClassifier(random_state=42)
-    X_dummy = np.random.randn(10, 23)
-    y_dummy = np.random.randint(0, 2, size=10)
-    model.fit(X_dummy, y_dummy)
 
-# Define request schema
-# Expected features must match the 22 columns of the preprocessed dataset
+if os.path.exists(MODEL_PATH):
+    try:
+        model = mlflow.sklearn.load_model(MODEL_PATH)
+        print(f"[OK] Model loaded successfully from '{MODEL_PATH}/'.")
+    except Exception as e:
+        print(f"[ERROR] Failed to load model from '{MODEL_PATH}/': {e}")
+        print("[ERROR] Please ensure a valid MLflow model exists in the 'model/' directory.")
+        sys.exit(1)
+else:
+    print(f"[ERROR] Model directory '{MODEL_PATH}/' not found.")
+    print("[ERROR] Please run modelling.py first to train and save the model.")
+    sys.exit(1)
+
+# --- COMPUTE REAL ACCURACY FROM TEST DATA ---
+computed_accuracy = None
+TEST_DATA_PATHS = [
+    os.path.join("Membangun_model", "dataset_preprocessed", "test.csv"),
+    os.path.join("dataset_preprocessed", "test.csv"),
+    os.path.join("Eksperimen_SML_Kevinadiputra", "preprocessing", "dataset_preprocessed", "test.csv"),
+]
+
+test_data_path = None
+for path in TEST_DATA_PATHS:
+    if os.path.exists(path):
+        test_data_path = path
+        break
+
+if test_data_path is not None:
+    try:
+        test_df = pd.read_csv(test_data_path)
+        X_test = test_df.drop(columns=["target"])
+        y_test = test_df["target"]
+        y_pred = model.predict(X_test)
+        computed_accuracy = accuracy_score(y_test, y_pred)
+        model_accuracy.set(computed_accuracy)
+        print(f"[OK] Model accuracy computed from test data: {computed_accuracy:.4f}")
+    except Exception as e:
+        print(f"[WARNING] Could not compute accuracy from test data: {e}")
+        print("[WARNING] model_accuracy_ratio metric will remain at 0 until test data is available.")
+else:
+    print("[WARNING] Test dataset not found. model_accuracy_ratio will remain at 0.")
+    print(f"[WARNING] Searched paths: {TEST_DATA_PATHS}")
+
+
+# Define request schema matching the 22 preprocessed feature columns
 class InferenceRequest(BaseModel):
     age: float
     trestbps: float
@@ -109,6 +140,7 @@ class InferenceRequest(BaseModel):
     age_group_1: int = 0
     age_group_2: int = 0
 
+
 @app.middleware("http")
 async def log_response_time(request: Request, call_next):
     """Middleware to measure the overall response time of the API."""
@@ -123,23 +155,26 @@ async def log_response_time(request: Request, call_next):
         error_count.inc()
         raise e
 
+
 @app.get("/")
 def read_root():
     return {
         "status": "online",
         "service": "Heart Disease Serving & Monitoring System",
+        "model_accuracy": computed_accuracy,
         "docs_url": "/docs"
     }
 
+
 @app.post("/predict")
 def predict(request: InferenceRequest):
-    """Inference endpoint that returns target predictions."""
+    """Inference endpoint that returns target predictions using the real trained model."""
     start_inference_time = time.time()
     try:
         # Convert request body to dataframe matching expected shape
         input_data = pd.DataFrame([request.model_dump()])
         
-        # Make prediction
+        # Make prediction using real model
         pred = model.predict(input_data)[0]
         prob = model.predict_proba(input_data)[0][int(pred)]
         
@@ -147,8 +182,9 @@ def predict(request: InferenceRequest):
         inference_latency = time.time() - start_inference_time
         prediction_latency.observe(inference_latency)
         
-        # Increment prediction count
+        # Increment counters
         prediction_count.inc()
+        prediction_success.inc()
         
         return {
             "prediction": int(pred),
@@ -158,22 +194,24 @@ def predict(request: InferenceRequest):
         }
     except Exception as e:
         error_count.inc()
+        prediction_failed.inc()
         raise HTTPException(status_code=500, detail=f"Prediction Error: {str(e)}")
+
 
 @app.get("/metrics")
 def metrics():
-    """Prometheus metrics scrape endpoint."""
-    # Update system stats
+    """Prometheus metrics scrape endpoint. All metrics are from real inference."""
+    # Update system resource stats
     cpu_usage.set(psutil.cpu_percent())
     memory_usage.set(psutil.virtual_memory().percent)
     disk_usage.set(psutil.disk_usage("/").percent)
     
-    # Calculate throughput
+    # Calculate throughput from real request counter
     uptime = time.time() - startup_time
     total_requests = request_count._value.get()
     throughput.set(total_requests / (uptime + 1e-5))
     
-    # Hardcode/Get the model accuracy (e.g. 0.85)
-    model_accuracy.set(0.852)
+    # model_accuracy is already set at startup from real test data
+    # No hardcoded values — accuracy comes from accuracy_score(y_test, y_pred)
     
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
