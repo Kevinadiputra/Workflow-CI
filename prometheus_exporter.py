@@ -176,6 +176,10 @@ def predict(request: InferenceRequest):
         # Convert request body to dataframe matching expected shape
         input_data = pd.DataFrame([request.model_dump()])
         
+        # Ensure column order matches the model's training feature order
+        if hasattr(model, "feature_names_in_"):
+            input_data = input_data[model.feature_names_in_]
+        
         # Make prediction using real model
         pred = model.predict(input_data)[0]
         prob = model.predict_proba(input_data)[0][int(pred)]
