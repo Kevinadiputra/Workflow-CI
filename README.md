@@ -1,4 +1,4 @@
-# 🚀 Model Training, Deployment CI & Serving/Monitoring - Heart Disease Classification
+# Model Training, Deployment CI & Serving/Monitoring - Heart Disease Classification
 
 [![Model Training and Deployment CI](https://github.com/Kevinadiputra/Workflow-CI/actions/workflows/ci-training.yml/badge.svg)](https://github.com/Kevinadiputra/Workflow-CI/actions/workflows/ci-training.yml)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.90+-009688.svg?style=flat&logo=fastapi)](https://fastapi.tiangolo.com/)
@@ -11,7 +11,7 @@ Repositori ini merupakan pusat integrasi berkelanjutan (**Workflow-CI**) dan pen
 
 ---
 
-## 🏋️ Pelatihan Model & MLflow Project
+## Pelatihan Model & MLflow Project
 
 Proses pelatihan model dibungkus sebagai **MLflow Project** terstandarisasi untuk memastikan proses reproduksibilitas eksperimen.
 
@@ -24,7 +24,7 @@ Proses pelatihan model dibungkus sebagai **MLflow Project** terstandarisasi untu
 
 ---
 
-## ⛓️ Alur Integrasi Berkelanjutan (Workflow CI)
+## Alur Integrasi Berkelanjutan (Workflow CI)
 
 Alur CI pada GitHub Actions dikonfigurasi untuk mengeksekusi pipeline dari pelatihan hingga kontainerisasi secara otomatis saat terdapat push kode baru.
 
@@ -39,7 +39,7 @@ Alur CI pada GitHub Actions dikonfigurasi untuk mengeksekusi pipeline dari pelat
 
 ---
 
-## 🔌 Serving & Pemantauan (FastAPI + Prometheus)
+## Serving & Pemantauan (FastAPI + Prometheus)
 
 Penyajian model dikembangkan menggunakan **FastAPI** yang menggabungkan endpoint prediksi dan pemantauan sistem secara real-time.
 
@@ -63,7 +63,7 @@ Penyajian model dikembangkan menggunakan **FastAPI** yang menggabungkan endpoint
 
 ---
 
-## 📈 Konfigurasi Pemantauan & Peringatan (Alerting)
+## Konfigurasi Pemantauan & Peringatan (Alerting)
 
 ### 1. Prometheus Scraping Target
 Server Prometheus dikonfigurasi melalui [`prometheus/prometheus.yml`](file:///prometheus/prometheus.yml) untuk menarik data dari target model serving setiap 5 detik dengan status target **UP**.
@@ -82,7 +82,7 @@ Grafana dikonfigurasi dengan 6 Alerting Rules aktif untuk mendeteksi anomali pad
 
 ---
 
-## 🛠️ Cara Menjalankan secara Lokal
+## Cara Menjalankan secara Lokal
 
 1. **Jalankan Model Serving (FastAPI)**:
    ```bash
